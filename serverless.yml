@@ -1,0 +1,42 @@
+service: serverless-api
+
+provider:
+  name: aws
+  runtime: nodejs6.10
+  stage: dev
+  region: us-east-1
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:DeleteItem
+      Resource: "*"
+      
+functions:
+  new_customer:
+    handler: customer.create
+    description: Adds a new customer to the database
+    events:
+    - http:
+        path: customer
+        method: post
+        cors: true
+  get_customers:
+    handler: customer.getAll
+    description: Retrieves a list of all customers
+    events:
+    - http:
+        path: customer
+        method: get
+        cors: true
+  delete_customer:
+    handler: customer.delete
+    description: Deletes the record for the specified customer
+    events:
+    - http:
+        path: customer
+        method: delete
+        cors: true
