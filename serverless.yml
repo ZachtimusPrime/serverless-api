@@ -16,27 +16,48 @@ provider:
       Resource: "*"
       
 functions:
-  new_customer:
-    handler: customer.create
-    description: Adds a new customer to the database
+  customer:
+    handler: customer.router
     events:
-    - http:
-        path: customer
-        method: post
-        cors: true
-  get_customers:
-    handler: customer.getAll
-    description: Retrieves a list of all customers
-    events:
-    - http:
-        path: customer
-        method: get
-        cors: true
-  delete_customer:
-    handler: customer.delete
-    description: Deletes the record for the specified customer
-    events:
-    - http:
-        path: customer
-        method: delete
-        cors: true
+      - http:
+          path: customer
+          method: any
+          cors: true
+      - http:
+          path: customer/{id}
+          method: any
+          cors: true
+
+  # new_customer:
+  #   handler: customer.create
+  #   description: Adds a new customer to the database
+  #   events:
+  #   - http:
+  #       path: customer
+  #       method: post
+  #       cors: true
+  # list_customers:
+  #   handler: customer.getAll
+  #   description: Retrieves a list of all customers
+  #   events:
+  #   - http:
+  #       path: customer
+  #       method: get
+  #       cors: true
+  # delete_customer:
+  #   handler: customer.delete
+  #   description: Deletes the record for the specified customer
+  #   events:
+  #   - http:
+  #       path: customer
+  #       method: delete
+  #       cors: true
+  
+  # update_customer:
+  #   handler: customer.update
+  #   description: Updates the record for the specified customer
+  #   events:
+  #   - http:
+  #       path: customer
+  #       method: put
+  #       cors: true
