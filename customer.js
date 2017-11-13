@@ -48,7 +48,7 @@ function listItems(event, context, callback) {
 
     var params = {
         TableName: table,
-        ProjectionExpression: "id, firstName, lastName, updatedAt"
+        ProjectionExpression: "id, firstName, lastName, username, email, updatedAt"
     };
 
     console.log("Scanning user table.");
@@ -73,10 +73,25 @@ function listItems(event, context, callback) {
 }
 
 
+function validateEmail(email) {
+    var re = /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+    return re.test(email);
+}
+
+function validateUsername(username) {
+    var re = /^[a-zA-Z0-9]{1,16}$/;
+    return re.test(username);
+}
+
+function validateId(Id) {
+    var re = /^[a-zA-Z0-9]{8}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{12}$/;
+    return re.test(Id);
+}
+
 function createItem(event, context, callback) {
     // Request validation
     const requestBody = JSON.parse(event.body);
-    if (!("firstName" in requestBody) === true || !("lastName" in requestBody) || !("username" in requestBody)) {
+    if (!("firstName" in requestBody) === true || !("lastName" in requestBody) || !("username" in requestBody) || !("email" in requestBody)) {
         console.error('Validation Failed');
         callback(new Error('Couldn\'t submit new customer because of validation errors.'));
         return;
@@ -85,8 +100,10 @@ function createItem(event, context, callback) {
     const firstName = requestBody.firstName;
     const lastName = requestBody.lastName;
     const username = requestBody.username;
+    const email = requestBody.email;
+
     
-    if (typeof firstName !== 'string' || typeof lastName !== 'string' || typeof username !== 'string') {
+    if (typeof firstName !== 'string' || typeof lastName !== 'string' || typeof username !== 'string' || validateEmail(email) === false) {
         console.error('Validation Failed');
         callback(new Error('Couldn\'t submit new customer because of validation errors.'));
         return;
@@ -96,7 +113,7 @@ function createItem(event, context, callback) {
     const dynamoDb = new AWS.DynamoDB.DocumentClient();
 
     // Build DB entry
-    const timestamp = new Date();
+    const timestamp = new Date().getTime();
     var params = {
         TableName: table,
         Item: {
@@ -105,7 +122,8 @@ function createItem(event, context, callback) {
             "id": uuid.v1(),
             "username": username,
             "submittedAt": timestamp,
-            "updatedAt": timestamp
+            "lastUpdated": timestamp,
+            "email": email
         }
     };
 
@@ -141,7 +159,7 @@ function deleteItem(event, context, callback) {
     const user_id = event["pathParameters"]["id"];
     //const id = event.pathParameters.id;
 
-    if (/^[a-zA-Z0-9]{8}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{12}$/.test(user_id) === false) {
+    if (validateId(user_id) === false) {
         console.error('Validation Failed');
         callback(new Error('Couldn\'t delete customer because of id validation errors.'));
         return;
@@ -178,26 +196,48 @@ function putItem(event, context, callback) {
 
     // Request validation
     const user_id = event["pathParameters"]["id"];
-    //const id = event.pathParameters.id;
 
-    if (/^[a-zA-Z0-9]{8}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{12}$/.test(user_id) === false) {
+    if (validateId(user_id) === false) {
         console.error('Validation Failed');
-        callback(new Error('Couldn\'t delete customer because of id validation errors.'));
+        callback(new Error('Couldn\'t update customer because of id validation errors.'));
         return;
     }
+
+    const requestBody = JSON.parse(event.body);
+    if (!("username" in requestBody) === true && !("email" in requestBody) === true) {
+        console.error('Validation Failed');
+        callback(new Error('Couldn\'t submit update to customer record because of validation errors.'));
+        return;
+    }
+
+    var attributes = {
+        ":lastUpdated": new Date().getTime()
+    };
+
+    if ('username' in requestBody && validateUsername(requestBody.username) === true) {
+        attributes[':username'] = requestBody.username
+    }
+
+    if ('email' in requestBody && validateEmail(requestBody.email) === true) {
+        attributes[':email'] = requestBody.email
+    }
+
+    var expression = ("set");
+    Object.keys(attributes).forEach(function(key) {
+        expression += (" " + key.slice(1,key.length) + " = " + key + ",")
+    });
+
 
     var params = {
         TableName: table,
         Key: {
             id: user_id
-        }
-        ,
-        UpdateExpression: "set username = :u",
-        ExpressionAttributeValues:{
-            ":u":5.5
         },
+        UpdateExpression: expression.slice(0,-1),
+        ExpressionAttributeValues: attributes,
         ReturnValues:"UPDATED_NEW"
     };
+
 
     const onPut = (err, data) => {
 
@@ -215,122 +255,3 @@ function putItem(event, context, callback) {
     console.log("Updating customer's username.");
     dynamoDb.update(params, onPut);
 }
-
-
-
-
-// module.exports.create = (event, context, callback) => {
-
-//     // Request validation
-//     const requestBody = JSON.parse(event.body);
-//     // const firstName = event['firstName'];
-//     const firstName = requestBody.firstName;
-//     // const lastName = event['lastName'];
-//     const lastName = requestBody.lastName;
-//     if (typeof firstName !== 'string' || typeof lastName !== 'string') {
-//         console.error('Validation Failed');
-//         callback(new Error('Couldn\'t submit new customer because of validation errors.'));
-//         return;
-//     }
-
-//     // Establish Dynamo connection
-//     const dynamoDb = new AWS.DynamoDB.DocumentClient();
-
-//     // Build DB entry
-//     const timestamp = new Date().getTime();
-//     var params = {
-//         TableName: table,
-//         Item:{
-//             "firstName": firstName,
-//             "lastName": lastName,
-//             "id": uuid.v1(),
-//             "submittedAt": timestamp,
-//             "updatedAt": timestamp
-//         }
-//     };
-
-//     console.log("Adding a new item...");
-
-//     const onPut = (err, data) => {
-
-//         if (err) {
-//             console.error("Unable to add item. Error JSON:" + JSON.stringify(err, null, 2));
-//             callback(err);
-//         } else {
-//             console.log("Added item:" + JSON.stringify(data, null, 2));
-//             var dataText = JSON.stringify(data, null, 2);
-//             return callback(null, {
-//                 statusCode: 201,
-//                 body: JSON.stringify({
-//                     message: ("Added item:" + dataText),
-//                 })
-//             });
-//         }
-
-//     };
-
-//     dynamoDb.put(params, onPut);
-
-//   // Use this code if you don't use the http event with the LAMBDA-PROXY integration
-//   // callback(null, { message: 'Go Serverless v1.0! Your function executed successfully!', event });
-// };
-
-
-// module.exports.getAll = (event, context, callback) => {
-
-//     // Establish Dynamo connection
-//     const dynamoDb = new AWS.DynamoDB.DocumentClient();
-
-
-//     var params = {
-//         TableName: table,
-//         ProjectionExpression: "id, firstName, lastName, updatedAt"
-//     };
-
-//     console.log("Scanning Candidate table.");
-//     const onScan = (err, data) => {
-
-//         if (err) {
-//             console.log('Scan failed to load data. Error JSON:', JSON.stringify(err, null, 2));
-//             callback(err);
-//         } else {
-//             console.log("Scan succeeded.");
-//             return callback(null, {
-//                 statusCode: 200,
-//                 body: JSON.stringify({
-//                     users: data.Items
-//                 })
-//             });
-//         }
-
-//     };
-
-//     dynamoDb.scan(params, onScan);
-
-// };
-
-
-// module.exports.delete = (event, context, callback) => {
-
-//     // Establish Dynamo connection
-//     const dynamoDb = new AWS.DynamoDB.DocumentClient();
-
-//     // Request validation
-//     const requestBody = JSON.parse(event.body);
-//     const user_id = requestBody.id;
-//     if (typeof user_id !== 'string' || /^[a-zA-Z0-9]{8}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{12}$/.test(user_id) === false) {
-//         console.error('Validation Failed');
-//         callback(new Error('Couldn\'t delete customer because of id validation errors.'));
-//         return;
-//     }
-
-//     var params = {
-//         TableName: table,
-//         Key: {
-//             id: user_id
-//         }
-//     };
-
-//     console.log("Deleting user from table.");
-//     dynamoDb.delete(params, callback);
-// };
